@@ -1,0 +1,11 @@
+[project]
+name = "agent-collab"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "browser-use>=0.7.9",
+    "google-genai>=1.38.0",
+    "pydantic>=2.11.9",
+]
