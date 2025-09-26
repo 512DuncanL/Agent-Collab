@@ -348,7 +348,7 @@ class Project:
 
         print("Debug (task history):\n" + full_agent_task_history) # TODO
 
-        current_files = f"Output Files: {', '.join(listdir('./file_system_output'))}\nCollaborative Files: {', '.join(listdir('./file_system_collab'))}"
+        current_files = f"Output Files: {', '.join(listdir('./file_system_output'))}\nCollaborative Files: {', '.join(listdir('./file_system_collab'))}".replace(".gitkeep, ", "")
         for agent in self.agents:
             current_files += f"\nAgent {agent.get_id()}'s Private Files: " + ", ".join(listdir(f"./file_system_{agent.get_id()}"))
 
