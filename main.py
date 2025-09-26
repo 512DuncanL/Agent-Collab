@@ -1,6 +1,7 @@
 from browser_use import Agent as BrowserAgent, ChatGoogle, Tools, Browser
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 from os.path import isfile
 from os import listdir
 from prompts import AGENT_SYSTEM_PROMPT, AGENT_TRAITS, BRAINSTORM_PROMPT, DISCUSS_PROMPT
@@ -64,17 +65,17 @@ class Agent:
                 response = client.models.generate_content(
                     model=self.llm_name,
                     contents=brainstorm_prompt,
-                    config={
-                        "response_mime_type": "application/json",
-                        "response_schema": Brainstorm,
-                    }
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=Brainstorm.model_json_schema(),
+                    )
                 )
 
-                return response.parsed
+                return Brainstorm.model_validate(response.parsed)
             except Exception as e:
                 attempts += 1
                 print(f"(Attempt {attempts}) Brainstorm for Agent_{self._id} failed with exception: {e}")
-                sleep(1)
+                sleep(5)
 
         return None
 
@@ -227,7 +228,7 @@ class Agent:
             print(f"\n\n\n\n\nDebug (work history output generation for agent {self._id}:\n{e}\n\n\n\n\n")
         #self.outputs.append(agent_output)
 
-        # await browser.kill()
+        await browser.kill()
 
         #return agent_output
 
@@ -256,17 +257,17 @@ class Agent:
                 response = client.models.generate_content(
                     model=self.llm_name,
                     contents=discuss_prompt,
-                    config={
-                        "response_mime_type": "application/json",
-                        "response_schema": Discuss,
-                    }
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_json_schema=Discuss.model_json_schema(),
+                    )
                 )
 
-                return response.parsed
+                return Discuss.model_validate(response.parsed)
             except Exception as e:
                 attempts += 1
                 print(f"(Attempt {attempts}) Discussion for Agent_{self._id} failed with exception: {e}")
-                sleep(1)
+                sleep(5)
 
         return None
 
@@ -308,11 +309,14 @@ class Project:
             current_agent = current_agent + 1 if current_agent < TOTAL_AGENTS - 1 else 0
 
             if votes >= TOTAL_AGENTS:
-                for subtask in subtask_assignments:
-                    agent_id = int(subtask[0][6:])
-                    self.agents[agent_id].add_task(subtask[1])
+                for i, agent_name in enumerate(subtask_assignments):
+                    if i >= TOTAL_AGENTS:
+                        break # output sometimes contains non-agents
 
-                    print("Debug (assigned tasks):", subtask[0], subtask[1]) # TODO
+                    agent_id = int(agent_name[6:])
+                    self.agents[agent_id].add_task(subtask_assignments[agent_name])
+
+                    print("Debug (assigned tasks):", agent_name, subtask_assignments[agent_name]) # TODO
 
                 break
 

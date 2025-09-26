@@ -50,7 +50,7 @@ Brainstorm how to approach this project. Consider:
 - If any platforms or websites are specified in the project goal and are relevant to subtasks, add them to the subtask description.
 - Not everything needs to be completed within a given work round.
 
-Your response will contain a message containing your ideas to the team, a list of $total_agents lists containing two items (agent name and a detailed overview of their assigned subtask), as well as a vote to decide if no further brainstorming is required. Vote true to finish brainstorming and vote false to continue brainstorming.
+Your response will contain a message containing your ideas to the team, a dictionaries of size $total_agents with agent name as the key and a detailed overview of their assigned subtask as the value, as well as a vote to decide if no further brainstorming is required. Vote true to finish brainstorming and vote false to continue brainstorming.
 
 ---
 
@@ -89,7 +89,7 @@ Tips:
 - If any platforms or websites are specified in the project goal and are relevant to subtasks, add them to the subtask description.
 - Not everything needs to be completed within a given work round.
 
-Your response will contain a message containing your ideas to the team, a list of $total_agents lists containing two items (agent name and a detailed overview of their assigned subtask), a vote to decide if no further discussion is required, and a vote to decide if the project has been completed. Vote true to finish discussing / complete the project and vote false to continue discussing / continue the project.
+Your response will contain a message containing your ideas to the team, a dictionaries of size $total_agents with agent name as the key and a detailed overview of their assigned subtask as the value, a vote to decide if no further discussion is required, and a vote to decide if the project has been completed. Vote true to finish discussing / complete the project and vote false to continue discussing / continue the project.
 
 ---
 

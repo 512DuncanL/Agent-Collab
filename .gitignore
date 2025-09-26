@@ -2,3 +2,15 @@
 testing.py
 __pycache__/
 .idea/
+
+file_system_*/
+agent-profile-*/
+
+!file_system_collab/
+!file_system_output/
+
+file_system_collab/*
+file_system_output/*
+
+!file_system_collab/.gitkeep
+!file_system_output/.gitkeep
