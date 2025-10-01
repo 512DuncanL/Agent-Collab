@@ -55,7 +55,8 @@ class Agent:
         brainstorm_prompt = self.system_prompt + "\n---" + BRAINSTORM_PROMPT.substitute( # There is no built-in system prompt for structured output
             objective=objective,
             total_agents=TOTAL_AGENTS,
-            current_conversation=current_conversation
+            current_conversation=current_conversation,
+            agent_id=self._id
         )
 
         attempts = 0
@@ -92,7 +93,7 @@ class Agent:
             if not filename:
                 return "Error: File name was not provided."
 
-            if len(filename.split(".")) != 2 or filename.split(".")[-1] not in ["txt", "md", "csv", "json", "pdf"]:
+            if len(filename.split(".")) == 1 or filename.split(".")[-1] not in ["txt", "md", "csv", "json", "pdf"]:
                 return f"Error: Invalid file extension."
 
             if not isfile(f"{path}/{filename}"):
@@ -124,7 +125,7 @@ class Agent:
 
             path = f"./file_system_{self._id}" if file_type == "private" else "./file_system_collab" if file_type == "collab" else "./file_system_output"
 
-            if len(filename.split(".")) != 2 or filename.split(".")[-1] not in ["txt", "md", "csv", "json"]:
+            if len(filename.split(".")) == 1 or filename.split(".")[-1] not in ["txt", "md", "csv", "json"]:
                 return f"Error: Invalid file extension."
 
             with open(f"{path}/{filename}", 'w', encoding='utf-8') as f:
@@ -140,7 +141,7 @@ class Agent:
             if not filename:
                 return "Error: File name was not provided."
 
-            if len(filename.split(".")) != 2 or filename.split(".")[-1] not in ["txt", "md", "csv", "json"]:
+            if len(filename.split(".")) == 1 or filename.split(".")[-1] not in ["txt", "md", "csv", "json"]:
                 return f"Error: Invalid file extension."
 
             if not isfile(f"{path}/{filename}"):
@@ -197,7 +198,7 @@ class Agent:
 
         browser = Browser(
             downloads_path=f"./file_system_{self._id}",
-            window_size={'width': 1920, 'height': 1080},
+            window_size={'width': 1280, 'height': 800},
             user_data_dir=f'./agent-profile-{self._id}'
         )
         browser_llm = ChatGoogle(model=self.llm_name, temperature=0.6)
@@ -247,7 +248,8 @@ class Agent:
             task_history=task_history,
             current_files=current_files,
             max_iterations=max_iterations,
-            current_iteration=current_iteration
+            current_iteration=current_iteration,
+            agent_id=self._id
         )
 
         attempts = 0
@@ -316,7 +318,7 @@ class Project:
                     agent_id = int(agent_name[6:])
                     self.agents[agent_id].add_task(subtask_assignments[agent_name])
 
-                    print("Debug (assigned tasks):", agent_name, subtask_assignments[agent_name]) # TODO
+                    print("Debug (assigned tasks for agent {agent_id}):", agent_name, subtask_assignments[agent_name]) # TODO
 
                 break
 
@@ -342,8 +344,8 @@ class Project:
             assert len(executed_tasks) == len(outputs), f"agent {agent.get_id()}'s tasks: {len(executed_tasks), executed_tasks}, outputs: {len(outputs), outputs}" # Sanity check
             full_agent_task_history += f"Agent_{agent.get_id()}'s completed tasks and task outputs:\n"
             for i in range(len(executed_tasks)):
-                full_agent_task_history += f"Description of task {i}: {executed_tasks[i]}\n\n"
-            full_agent_task_history += f"\nActions completed for task {len(executed_tasks) - 1}: {outputs[len(executed_tasks) - 1]}\n\n---\n"
+                full_agent_task_history += f"Description of task {i} of Agent_{agent.get_id()}: {executed_tasks[i]}\n\n"
+            full_agent_task_history += f"\nActions completed for task {len(executed_tasks) - 1} of Agent_{agent.get_id()}: {outputs[len(executed_tasks) - 1]}\n---\n\n"
             # We add all previous task descriptions + actions for most recent task to context
 
         print("Debug (task history):\n" + full_agent_task_history) # TODO
@@ -381,11 +383,14 @@ class Project:
                 sys.exit(0)
 
             if discussion_votes >= TOTAL_AGENTS or rounds >= DISCUSSION_LIMIT:
-                for subtask in subtask_assignments[:TOTAL_AGENTS]:
-                    agent_id = int(subtask[0][6:])
-                    self.agents[agent_id].add_task(subtask[1])
+                for i, agent_name in enumerate(subtask_assignments):
+                    if i >= TOTAL_AGENTS:
+                        break  # output sometimes contains non-agents
 
-                    print(f"Debug (assigned tasks for agent {agent_id}):", subtask[0], subtask[1]) # TODO
+                    agent_id = int(agent_name[6:])
+                    self.agents[agent_id].add_task(subtask_assignments[agent_name])
+
+                    print("Debug (assigned tasks):", agent_name, subtask_assignments[agent_name])  # TODO
 
                 break
 
@@ -399,9 +404,13 @@ class Project:
             self.discuss()
             self.work()
 
+        print(f"The project objective \"{self.objective}\" has been completed after {self.iteration_number - 1} iterations of work.")
+        input("Press Enter to continue...")
+        sys.exit(0)
+
 project = Project(
-    objective="Conduct research on the effects of tobacco on children and write a comprehensive academic paper on it in a markdown file named `final_report.md`. Remember to cite sources.",
-    max_iterations=10
+    objective="Conduct research on the effects of tobacco on children and create a full stack website on it using Flask as the backend. Keep the original file extension behind the `.txt` extension. No matter the file type, the extension should always end with `.txt`. For example, the main python file could be named `main.py.txt`.",
+    max_iterations=6
 )
 
 for i in range(TOTAL_AGENTS):

@@ -13,6 +13,16 @@ AGENT_SYSTEM_PROMPT = Template(f"""
 
 Your Unique Traits: $agent_traits
 
+Information Regarding Files:
+ - The file system is divided into three types of files: `private`, `collab`, and `output`.
+ - **Private files**: Accessible only to the agent that created them. Use these when the information does not need to be shared with other agents or shown to the user.
+ - **Collaborative files**: Accessible to all agents. Use these when information needs to be visible or editable by the entire group (e.g., drafts for a group report).
+ - **Output files**: Visible to the user and accessible to all agents. Use these for final results, reports, or other content intended for direct presentation.
+""")
+
+BRAINSTORM_PROMPT = Template("""
+Project Goal: $objective
+
 Core Principles:
 - You are an equal contributor with unique perspective and skills
 - Respect all team members' ideas and build upon them
@@ -25,17 +35,6 @@ Communication Style:
 - Start messages with "Agent_$agent_id:"
 - Be constructive and solution-oriented
 - Acknowledge others' contributions
-
-Information Regarding Files:
-- Files can either be private, collaborative, or output
-- Collaborative files can be accessed by all agents, while private files can only be accessed by the agent that created them
-- Use collaborative files when information needs to be accessible by all agents (e.g. a group report), otherwise use private files
-- Use output files for files that will be shown to the user only
-- Use private files if the information they contain do not need to be shown to other agents
-""")
-
-BRAINSTORM_PROMPT = Template("""
-Project Goal: $objective
 
 Brainstorm how to approach this project. Consider:
 1. What are the main components needed?
@@ -80,6 +79,19 @@ Details on work that has already been completed is listed above. Please:
 1. Review others' work and provide feedback
 2. Suggest improvements or next steps
 3. Flag any issues or gaps
+
+Core Principles:
+- You are an equal contributor with unique perspective and skills
+- Respect all team members' ideas and build upon them
+- Be concise but thorough in discussions
+- Take ownership of tasks you're best suited for
+- Ask for help when needed
+- Share progress transparently
+
+Communication Style:
+- Start messages with "Agent_$agent_id:"
+- Be constructive and solution-oriented
+- Acknowledge others' contributions
 
 Tips:
 - You should contribute ideas and propose subtasks that agents can handle based on their expertise.
