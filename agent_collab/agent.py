@@ -171,7 +171,7 @@ class Agent:
                 return Brainstorm.model_validate(response.parsed)
             except Exception as e:
                 attempts += 1
-                print(f"(Attempt {attempts}) Brainstorm for Agent_{self.agent_id} failed with exception: {e}")
+                self._project.logger.warning(f"(Attempt {attempts}) Brainstorm for Agent_{self.agent_id} failed with exception: {e}")
                 sleep(5)
 
         raise Exception(f"Brainstorming for Agent_{self.agent_id} failed")
@@ -243,23 +243,20 @@ class Agent:
             browser=browser,
             max_history_items=75
         )
-        print("Running a browser agent!") # TODO
+
         history = await browser_agent.run(max_steps=self._steps_per_work_cycle)
 
-        try:
-            agent_output = history.model_outputs()
-            output_str = ""
-            for i, output in enumerate(agent_output):
-                if hasattr(output, "action"):
-                    delattr(output, "action")  # Saves tokens + we do not need that much information
+        agent_output = history.model_outputs()
+        output_str = ""
+        for i, output in enumerate(agent_output):
+            if hasattr(output, "action"):
+                delattr(output, "action")  # Saves tokens + we do not need that much information
 
-                if hasattr(output, "thinking"):
-                    delattr(output, "thinking")
-                output_str += f"\nStep {i}: {output}"
+            if hasattr(output, "thinking"):
+                delattr(output, "thinking")
+            output_str += f"\nStep {i}: {output}"
 
-            self._outputs.append(output_str + "\n")
-        except Exception as e:
-            print(f"\n\n\n\n\nDebug (work history output generation for agent {self.agent_id}:\n{e}\n\n\n\n\n")
+        self._outputs.append(output_str + "\n")
 
         await browser.kill()
 
@@ -293,7 +290,7 @@ class Agent:
                 return Discuss.model_validate(response.parsed)
             except Exception as e:
                 attempts += 1
-                print(f"(Attempt {attempts}) Discussion for Agent_{self.agent_id} failed with exception: {e}")
+                self._project.logger.warning(f"(Attempt {attempts}) Discussion for Agent_{self.agent_id} failed with exception: {e}")
                 sleep(5)
 
         raise Exception(f"Discussion for Agent_{self.agent_id} failed")

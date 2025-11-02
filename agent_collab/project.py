@@ -7,6 +7,7 @@ import asyncio
 from uuid import uuid4
 import random
 import glob
+import logging
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -39,6 +40,7 @@ class Project:
     _conversations: list[str]
     _iteration_number: int
     _completed: bool
+    _logger: logging.Logger
 
     def __init__(self, objective: str, max_iterations: int, total_agents: int, steps_per_work_cycle: int | list[int] = 50,
                  agent_traits: list[str] | None = None, llm_name: str | list[str] = "gemini-flash-latest", project_id: str = str(uuid4())):
@@ -56,8 +58,10 @@ class Project:
         self._conversations = [""]
         self._iteration_number = 1
         self._completed = False
+        self._logger = logging.getLogger(project_id)
 
-        if agent_traits is None: # Set agent traits
+        # Set agent traits
+        if agent_traits is None:
             agent_traits = random.choices(DEFAULT_AGENT_TRAITS, k=total_agents)
 
         if isinstance(steps_per_work_cycle, list) and len(steps_per_work_cycle) != total_agents:
@@ -70,7 +74,8 @@ class Project:
         else:
             llm_name = [llm_name] * total_agents
 
-        for i in range(total_agents): # Add agents to project
+        # Add agents to project
+        for i in range(total_agents):
             self.add_agent(Agent(
                 _id=i,
                 agent_traits=agent_traits[i],
@@ -79,7 +84,8 @@ class Project:
                 project=self
             ))
 
-        root_dir = Path(__file__).resolve().parent.parent # Create project folder
+        # Set up project folder
+        root_dir = Path(__file__).resolve().parent.parent
         self._project_dir = root_dir / project_id
 
         if self._project_dir.exists():
@@ -88,6 +94,13 @@ class Project:
         self._project_dir.mkdir()
         (self._project_dir / "file_system_collab").mkdir()
         (self._project_dir / "file_system_output").mkdir()
+
+        # Set up logging
+        file_handler = logging.FileHandler(self.project_dir / "logfile.log")
+        file_handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] - %(levelname)s: %(message)s"))
+
+        self.logger.addHandler(file_handler)
+        self.logger.setLevel(logging.INFO)
 
     @property
     def total_agents(self) -> int:
@@ -108,6 +121,10 @@ class Project:
     @property
     def project_dir(self) -> Path:
         return self._project_dir
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
 
     @property
     def max_iterations(self) -> int:
@@ -159,7 +176,7 @@ class Project:
                 current_conversation=self._conversations[-1]
             )
 
-            print("Debug (conversation): " + str(brainstorm_result))  # TODO
+            self.logger.info(f"Conversation: {brainstorm_result}")
 
             self._conversations[-1] += f"{brainstorm_result.message_to_team}\nMy proposed subtask assignments: {brainstorm_result.subtask_assignments}\n---\n"
 
@@ -174,7 +191,7 @@ class Project:
             agent_id = int(agent_name[6:])
             self._agents[agent_id].add_task(subtask_assignments[agent_name])
 
-            print(f"Debug (assigned tasks for agent {agent_id}):", agent_name, subtask_assignments[agent_name])  # TODO
+            self.logger.info(f"Assigned tasks for agent {agent_id}: {agent_name} {subtask_assignments[agent_name]}")
 
     async def work_round(self) -> None:
         work = [agent.work() for agent in self._agents]
@@ -192,12 +209,12 @@ class Project:
         # We add all previous task descriptions + actions for most recent task to context
         full_agent_task_history = self.get_full_agent_task_history()
 
-        print("Debug (task history):\n" + full_agent_task_history)  # TODO
+        self.logger.debug(f"Full task history: {full_agent_task_history}")
 
         # List out all files in files all file systems
         current_files = self.get_current_files()
 
-        print("Debug (files):\n" + current_files)  # TODO
+        self.logger.debug(f"Current files: {current_files}")
 
         while discussion_votes < self.total_agents and discussion_round < DISCUSSION_LIMIT:
             discuss_result = self._agents[current_agent].discuss(
@@ -206,7 +223,7 @@ class Project:
                 current_conversation=self._conversations[-1],
             )
 
-            print("Debug (conversation): " + str(discuss_result))  # TODO
+            self.logger.debug(f"Discussion object from Agent_{current_agent}: {discuss_result}")
 
             self._conversations[-1] += f"{discuss_result.message_to_team}\nMy proposed subtask assignments: {discuss_result.subtask_assignments}\n---\n"
 
@@ -231,7 +248,7 @@ class Project:
             agent_id = int(agent_name[6:])
             self._agents[agent_id].add_task(subtask_assignments[agent_name])
 
-            print("Debug (assigned tasks):", agent_name, subtask_assignments[agent_name])  # TODO
+            self.logger.info(f"Assigned tasks for agent {agent_id}: {agent_name} {subtask_assignments[agent_name]}")
 
     async def execute(self) -> None:
         await self.brainstorm_round()
@@ -245,4 +262,4 @@ class Project:
 
             await self.work_round()
 
-        print(f"The project objective has been completed after {self.iteration_number - 1} iterations of work.") # TODO
+        self.logger.info(f"The project objective has been completed after {self.iteration_number - 1} iterations of work.")
