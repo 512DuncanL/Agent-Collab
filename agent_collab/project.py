@@ -155,7 +155,7 @@ class Project:
         for agent in self._agents:
             executed_tasks, outputs = agent.task_history
 
-            assert len(executed_tasks) == len(outputs), f"agent {agent.agent_id}'s tasks: {len(executed_tasks), executed_tasks}, outputs: {len(outputs), outputs}"  # TODO: Sanity check
+            assert len(executed_tasks) == len(outputs), f"agent {agent.agent_id}'s tasks: {len(executed_tasks), executed_tasks}, outputs: {len(outputs), outputs}"  # Sanity check
 
             full_agent_task_history += f"Agent_{agent.agent_id}'s completed tasks and task outputs:\n"
             for i in range(len(executed_tasks)):
@@ -171,7 +171,9 @@ class Project:
         subtask_assignments = None
 
         while votes < self.total_agents:
-            brainstorm_result = self._agents[current_agent].brainstorm(
+
+            brainstorm_result = await asyncio.to_thread(
+                self._agents[current_agent].brainstorm,
                 objective=self.objective,
                 current_conversation=self._conversations[-1]
             )
@@ -217,7 +219,8 @@ class Project:
         self.logger.debug(f"Current files: {current_files}")
 
         while discussion_votes < self.total_agents and discussion_round < DISCUSSION_LIMIT:
-            discuss_result = self._agents[current_agent].discuss(
+            discuss_result = await asyncio.to_thread(
+                self._agents[current_agent].discuss,
                 task_history=full_agent_task_history,
                 current_files=current_files,
                 current_conversation=self._conversations[-1],
