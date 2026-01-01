@@ -1,11 +1,8 @@
 from __future__ import annotations
-from pathlib import Path
 from browser_use import Agent as BrowserAgent, ChatGoogle, Tools, Browser
 from google import genai
 from google.genai import types
-from os.path import isfile
 from time import sleep
-import pypdf
 
 client = genai.Client()
 
@@ -13,6 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .project import Project
 
+from .file_system import FileSystem
 from .prompts import AGENT_SYSTEM_PROMPT, BRAINSTORM_PROMPT, DISCUSS_PROMPT
 from .models import Brainstorm, Discuss
 
@@ -20,6 +18,7 @@ class Agent:
     _system_prompt: str
     _tasks: list[str]
     _outputs: list[str]
+    _file_system: FileSystem
 
     def __init__(self, _id: int, agent_traits: str, llm_name: str, steps_per_work_cycle: int, project: "Project") -> None:
         self._agent_id = _id
@@ -35,6 +34,7 @@ class Agent:
         )
         self._tasks = []
         self._outputs = []
+        self._file_system = FileSystem(agent_id=_id, project_dir=project.project_dir)
 
     @property
     def agent_id(self) -> int:
@@ -46,104 +46,6 @@ class Agent:
 
     def add_task(self, task: str) -> None:
         self._tasks.append(task)
-
-    def get_path(self, file_system: str) -> Path:
-        if file_system == "private":
-            return self._project.project_dir / f"file_system_{self.agent_id}"
-        elif file_system == "collab":
-            return self._project.project_dir / "file_system_collab"
-        else:
-            return self._project.project_dir / "file_system_output"
-
-    def _read_file(self, filename: str, file_system: str) -> str:
-        assert file_system in ["private", "collab", "output"], f"{file_system} is not a supported file system"
-
-        path = self.get_path(file_system=file_system)
-
-        if not filename:
-            return "Error: File name was not provided."
-
-        if len(filename.split(".")) == 1 or filename.split(".")[-1] not in ["txt", "md", "csv", "json", "pdf"]:
-            return f"Error: Invalid file extension."
-
-        if not isfile(path / filename):
-            return f"Error: File {filename} was not found."
-
-        extension = filename.split(".")[-1]
-
-        if extension in ["txt", "md", "csv", "json"]:
-            with open(path / filename, "r", encoding='utf-8') as f:
-                contents = f.read()
-
-            return f'Successfully read from {file_system} file {filename}.\n<content>\n{contents}\n</content>'
-        else:  # extension is pdf
-            reader = pypdf.PdfReader(path / filename)
-            num_pages = len(reader.pages)
-            MAX_PDF_PAGES = 15
-            extra_pages = num_pages - MAX_PDF_PAGES
-            extracted_text = ''
-
-            for page in reader.pages[:MAX_PDF_PAGES]:
-                extracted_text += page.extract_text()
-
-            extra_pages_text = f'{extra_pages} more pages...' if extra_pages > 0 else ''
-
-            return f'Successfully read from {file_system} file {filename}.\n<content>\n{extracted_text}\n{extra_pages_text}</content>'
-
-    def _write_file(self, filename: str, contents: str, file_system: str) -> str:
-        assert file_system in ["private", "collab", "output"], f"{file_system} is not a supported file system"
-
-        path = self.get_path(file_system=file_system)
-
-        if len(filename.split(".")) == 1 or filename.split(".")[-1] not in ["txt", "md", "csv", "json"]:
-            return f"Error: Invalid file extension."
-
-        with open(path / filename, 'w', encoding='utf-8') as f:
-            f.write(contents)
-
-        return f'Successfully wrote to {file_system} file {filename}'
-
-    def _replace_file_str(self, filename: str, old_str: str, new_str: str, file_system: str) -> str:
-        assert file_system in ["private", "collab", "output"], f"{file_system} is not a supported file system"
-
-        path = self.get_path(file_system=file_system)
-
-        if not filename:
-            return "Error: File name was not provided."
-
-        if len(filename.split(".")) == 1 or filename.split(".")[-1] not in ["txt", "md", "csv", "json"]:
-            return f"Error: Invalid file extension."
-
-        if not isfile(path / filename):
-            return f"Error: File {filename} was not found."
-
-        if not old_str:
-            return "Error: Cannot replace empty string. Please provide a non-empty string to replace."
-
-        with open(path / filename, 'r', encoding='utf-8') as f:
-            contents = f.read()
-
-        contents = contents.replace(old_str, new_str)
-
-        with open(path / filename, 'w', encoding='utf-8') as f:
-            f.write(contents)
-
-        return f'Successfully replaced all occurrences of "{old_str}" with "{new_str}" in {file_system} file {filename}'
-
-    def _create_folder(self, folder_name: str, file_system: str) -> str:
-        assert file_system in ["private", "collab", "output"], f"{file_system} is not a supported file system"
-
-        if not folder_name:
-            return "Error: Folder name was not provided."
-
-        path = self.get_path(file_system=file_system) / folder_name
-
-        if path.exists():
-            return f"Error: Folder {folder_name} already exists."
-
-        path.mkdir()
-
-        return f"Successfully created {file_system} folder {folder_name}"
 
     def brainstorm(self, objective: str, current_conversation: str) -> Brainstorm:
         brainstorm_prompt = self._system_prompt + "\n---" + BRAINSTORM_PROMPT.substitute(
@@ -183,51 +85,51 @@ class Agent:
 
         @tools.action(description='Read a file in the private file system named `filename`.')
         def read_private_file(filename: str) -> str:
-            return self._read_file(filename=filename, file_system="private")
+            return self._file_system.read_file(filename=filename, file_system="private")
 
         @tools.action(description='Write `contents` to a file in the private file system named `filename`. Overwrites previous file if it already exists.')
         def write_private_file(filename: str, contents: str) -> str:
-            return self._write_file(filename=filename, contents=contents, file_system="private")
+            return self._file_system.write_file(filename=filename, contents=contents, file_system="private")
 
         @tools.action(description='Replace `old_str` with `new_str` in a file in the private file system named `file_name`.')
         def replace_private_file_str(filename: str, old_str: str, new_str: str) -> str:
-            return self._replace_file_str(filename=filename, old_str=old_str, new_str=new_str, file_system="private")
+            return self._file_system.edit_file(filename=filename, old_str=old_str, new_str=new_str, file_system="private")
 
         @tools.action(description='Create a folder in the private file system named `folder_name`. Does nothing if it already exists.')
         def create_private_folder(folder_name: str) -> str:
-            return self._create_folder(folder_name=folder_name, file_system="private")
+            return self._file_system.create_folder(folder_name=folder_name, file_system="private")
 
         @tools.action(description='Read a file in the collaborative file system named `filename`.')
         def read_collab_file(filename: str) -> str:
-            return self._read_file(filename=filename, file_system="collab")
+            return self._file_system.read_file(filename=filename, file_system="collab")
 
         @tools.action(description='Write `contents` to a file in the collaborative file system named `filename`. Overwrites collaborative file if it already exists.')
         def write_collab_file(filename: str, contents: str) -> str:
-            return self._write_file(filename=filename, contents=contents, file_system="collab")
+            return self._file_system.write_file(filename=filename, contents=contents, file_system="collab")
 
         @tools.action(description='Replace `old_str` with `new_str` in a file in the collaborative file system named `file_name`.')
         def replace_collab_file_str(filename: str, old_str: str, new_str: str) -> str:
-            return self._replace_file_str(filename=filename, old_str=old_str, new_str=new_str, file_system="collab")
+            return self._file_system.edit_file(filename=filename, old_str=old_str, new_str=new_str, file_system="collab")
 
         @tools.action(description='Create a folder in the collaborative file system named `folder_name`. Does nothing if it already exists.')
         def create_collab_folder(folder_name: str) -> str:
-            return self._create_folder(folder_name=folder_name, file_system="collab")
+            return self._file_system.create_folder(folder_name=folder_name, file_system="collab")
 
         @tools.action(description='Read a file in the output file system named `filename`.')
         def read_output_file(filename: str) -> str:
-            return self._read_file(filename=filename, file_system="output")
+            return self._file_system.read_file(filename=filename, file_system="output")
 
         @tools.action(description='Write `contents` to a file in the output file system named `filename`. Overwrites output file if it already exists.')
         def write_output_file(filename: str, contents: str) -> str:
-            return self._write_file(filename=filename, contents=contents, file_system="output")
+            return self._file_system.write_file(filename=filename, contents=contents, file_system="output")
 
         @tools.action(description='Replace `old_str` with `new_str` in a file in the output file system named `file_name`.')
         def replace_output_file_str(filename: str, old_str: str, new_str: str) -> str:
-            return self._replace_file_str(filename=filename, old_str=old_str, new_str=new_str, file_system="output")
+            return self._file_system.edit_file(filename=filename, old_str=old_str, new_str=new_str, file_system="output")
 
         @tools.action(description='Create a folder in the output file system named `folder_name`. Does nothing if it already exists.')
         def create_output_folder(folder_name: str) -> str:
-            return self._create_folder(folder_name=folder_name, file_system="output")
+            return self._file_system.create_folder(folder_name=folder_name, file_system="output")
 
         browser = Browser(
             downloads_path=f"{self._project.project_dir}/file_system_{self.agent_id}",
