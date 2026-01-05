@@ -3,6 +3,7 @@ import asyncio
 from fastapi import FastAPI
 from aiocache import SimpleMemoryCache
 from aiocache.serializers import PickleSerializer
+from pydantic import BaseModel
 
 from agent_collab import Project
 
@@ -10,12 +11,18 @@ app = FastAPI()
 
 projects = SimpleMemoryCache(serializer=PickleSerializer()) # TODO: use RedisCache
 
-@app.post("/create_project")
-async def create_project(objective: str, max_iterations: int, total_agents: int, project_id: str | None) -> dict[str, str]:
-    project = Project(objective=objective, max_iterations=max_iterations, total_agents=total_agents, project_id=project_id)
+class CreateProjectRequest(BaseModel):
+    objective: str
+    max_iterations: int
+    total_agents: int
+    project_id: str | None = None
 
-    if project_id is not None:
-        await projects.set(project_id, project)
+@app.post("/create_project")
+async def create_project(req: CreateProjectRequest) -> dict[str, str]:
+    project = Project(objective=req.objective, max_iterations=req.max_iterations, total_agents=req.total_agents, project_id=req.project_id)
+
+    if req.project_id is not None:
+        await projects.set(req.project_id, project)
 
     asyncio.create_task(project.execute())
 

@@ -79,24 +79,14 @@ class Project:
         else:
             llm_name = [llm_name] * total_agents
 
-        # Add agents to project
-        for i in range(total_agents):
-            self.add_agent(Agent(
-                _id=i,
-                agent_traits=agent_traits[i],
-                llm_name=llm_name[i],
-                steps_per_work_cycle=steps_per_work_cycle[i],
-                project=self
-            ))
-
         # Set up project folder
         root_dir = Path(__file__).resolve().parent.parent
-        self._project_dir = root_dir / project_id
+        self._project_dir = root_dir / "outputs" / project_id
 
         if self._project_dir.exists():
             shutil.rmtree(self._project_dir)
 
-        self._project_dir.mkdir()
+        self._project_dir.mkdir(parents=True)
         (self._project_dir / "file_system_collab").mkdir()
         (self._project_dir / "file_system_output").mkdir()
 
@@ -106,6 +96,16 @@ class Project:
 
         self.logger.addHandler(file_handler)
         self.logger.setLevel(logging.INFO)
+
+        # Add agents to project
+        for i in range(total_agents):
+            self.add_agent(Agent(
+                _id=i,
+                agent_traits=agent_traits[i],
+                llm_name=llm_name[i],
+                steps_per_work_cycle=steps_per_work_cycle[i],
+                project=self
+            ))
 
     @property
     def total_agents(self) -> int:
