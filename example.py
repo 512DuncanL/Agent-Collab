@@ -3,7 +3,7 @@ import asyncio
 
 async def main():
     project_1 = Project(
-        objective="First conduct research on the effects of tobacco on children, and then create a full stack website on it using Flask as the backend. Keep the original file extension behind the `.txt` extension. No matter the file type, the extension should always end with `.txt`. For example, the main python file could be named `main.py.txt`.",
+        objective="First conduct research on the effects of tobacco on children, and then create a full stack website on it using Flask as the backend.",
         max_iterations=3,
         total_agents=3,
         project_id="tobacco"

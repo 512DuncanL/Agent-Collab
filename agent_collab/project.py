@@ -41,9 +41,10 @@ class Project:
     _iteration_number: int
     _completed: bool
     _logger: logging.Logger
+    _running: asyncio.Event
 
     def __init__(self, objective: str, max_iterations: int, total_agents: int, steps_per_work_cycle: int | list[int] = 50,
-                 agent_traits: list[str] | None = None, llm_name: str | list[str] = "gemini-flash-latest", project_id: str = str(uuid4())):
+                 agent_traits: list[str] | None = None, llm_name: str | list[str] = "gemini-flash-latest", project_id: str | None = str(uuid4())):
         """
         Note:
             `llm_name` must be a model supported by the Gemini API
@@ -53,12 +54,16 @@ class Project:
         self._max_iterations = max_iterations
         self._total_agents = total_agents
         self._steps_per_work_cycle = steps_per_work_cycle
-        self._project_id = project_id
+        self._project_id = project_id if project_id is not None else str(uuid4())
         self._agents = []
         self._conversations = [""]
         self._iteration_number = 1
         self._completed = False
         self._logger = logging.getLogger(project_id)
+        self._running = asyncio.Event()
+
+        # Project runs by default
+        self._running.set()
 
         # Set agent traits
         if agent_traits is None:
@@ -74,24 +79,14 @@ class Project:
         else:
             llm_name = [llm_name] * total_agents
 
-        # Add agents to project
-        for i in range(total_agents):
-            self.add_agent(Agent(
-                _id=i,
-                agent_traits=agent_traits[i],
-                llm_name=llm_name[i],
-                steps_per_work_cycle=steps_per_work_cycle[i],
-                project=self
-            ))
-
         # Set up project folder
         root_dir = Path(__file__).resolve().parent.parent
-        self._project_dir = root_dir / project_id
+        self._project_dir = root_dir / "outputs" / project_id
 
         if self._project_dir.exists():
             shutil.rmtree(self._project_dir)
 
-        self._project_dir.mkdir()
+        self._project_dir.mkdir(parents=True)
         (self._project_dir / "file_system_collab").mkdir()
         (self._project_dir / "file_system_output").mkdir()
 
@@ -101,6 +96,16 @@ class Project:
 
         self.logger.addHandler(file_handler)
         self.logger.setLevel(logging.INFO)
+
+        # Add agents to project
+        for i in range(total_agents):
+            self.add_agent(Agent(
+                _id=i,
+                agent_traits=agent_traits[i],
+                llm_name=llm_name[i],
+                steps_per_work_cycle=steps_per_work_cycle[i],
+                project=self
+            ))
 
     @property
     def total_agents(self) -> int:
@@ -137,6 +142,14 @@ class Project:
     @iteration_number.setter
     def iteration_number(self, value) -> None:
         self._iteration_number = value
+
+    def pause(self) -> None:
+        self.logger.info("Project paused")
+        self._running.clear()
+
+    def resume(self) -> None:
+        self.logger.info("Project resumed")
+        self._running.set()
 
     def add_agent(self, agent: Agent) -> None:
         self._agents.append(agent)
@@ -255,14 +268,18 @@ class Project:
 
     async def execute(self) -> None:
         await self.brainstorm_round()
+        await self._running.wait()
         await self.work_round()
         for _ in range(self.max_iterations - 1):
             self.iteration_number += 1
+
+            await self._running.wait()
             await self.discussion_round()
 
             if self._completed:
                 break
 
+            await self._running.wait()
             await self.work_round()
 
         self.logger.info(f"The project objective has been completed after {self.iteration_number - 1} iterations of work.")
